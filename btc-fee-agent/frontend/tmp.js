@@ -1,0 +1,22 @@
+const puppeteer = require('puppeteer-core');
+const path = `${process.env['ProgramFiles(x86)']}\\Microsoft\\Edge\\Application\\msedge.exe`;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+(async() => {
+  const browser = await puppeteer.launch({headless: true, executablePath: path, args: ['--window-size=1280,720']});
+  const page = await browser.newPage();
+  const logs = [];
+  page.on('console', msg => logs.push(`${msg.type()}: ${msg.text()}`));
+  page.on('requestfailed', req => logs.push(`requestfailed ${req.url()} ${req.failure()?.errorText}`));
+  page.on('response', res => { if (!res.ok()) logs.push(`response ${res.status()} ${res.url()}`); });
+  await page.goto('http://127.0.0.1:5500/index.html');
+  await page.click('button[data-tab="recommend"]');
+  await page.click('#btnRecommend');
+  await sleep(1200);
+  await page.click('button[data-tab="compare"]');
+  await sleep(200);
+  await page.waitForSelector('#compareGrid', {timeout: 5000});
+  await sleep(1200);
+  await page.screenshot({path:'../compare.png', fullPage:true});
+  console.log('logs:', logs);
+  await browser.close();
+})();

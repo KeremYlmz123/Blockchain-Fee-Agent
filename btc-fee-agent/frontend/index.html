@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bitcoin Fee Advisor</title>
+  <style>
+    :root {
+      --btc-gold: #f2a900;
+      --gold-dark: #d97706;
+      --black: #000000;
+      --near-black: #0a0a0a;
+      --dark-gray: #1a1a1a;
+      --border: #2a2a2a;
+      --text: #f6f6f6;
+      --muted: #a3a3a3;
+      --error: #ef4444;
+      --success: #10b981;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Inter', sans-serif;
+      background: var(--black);
+      color: var(--text);
+      line-height: 1.6;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .container { max-width: 1200px; margin: 0 auto; padding: 40px 24px; flex: 1; width: 100%; }
+    .header { margin-bottom: 32px; border-bottom: 2px solid var(--btc-gold); padding-bottom: 20px; }
+    .title-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+    .eyebrow { color: var(--btc-gold); font-size: 11px; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 8px; }
+    .header h1 { font-size: 40px; font-weight: 800; letter-spacing: -0.03em; margin-bottom: 8px; }
+    .lede { color: var(--muted); max-width: 520px; }
+    .tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+    .tab { padding: 10px 14px; background: transparent; border: 1px solid var(--border); color: var(--muted); cursor: pointer; border-radius: 6px; font-weight: 700; transition: all 0.2s; }
+    .tab:hover { border-color: var(--btc-gold); color: var(--text); }
+    .tab.active { background: var(--btc-gold); border-color: var(--btc-gold); color: var(--black); }
+    .tab-panel { animation: fadeIn 0.25s ease; }
+    .hidden { display: none; }
+    @keyframes fadeIn { from {opacity:0; transform: translateY(8px);} to {opacity:1; transform: translateY(0);} }
+    .card { background: var(--near-black); border: 1px solid var(--border); padding: 24px; margin-bottom: 18px; border-radius: 8px; box-shadow: 0 4px 24px rgba(242,169,0,0.08); }
+    .result-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+    .result-header h2 { font-size: 22px; }
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px,1fr)); gap: 14px; }
+    .stats div { background: var(--dark-gray); border: 1px solid var(--border); padding: 14px 16px; border-radius: 6px; border-left: 3px solid var(--btc-gold); }
+    .stats span { display: block; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; font-weight: 600; }
+    .stats b { font-size: 22px; color: var(--btc-gold); }
+    .row { display: grid; gap: 14px; margin-bottom: 16px; }
+    .row.two-col { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+    label { display: block; color: var(--muted); font-size: 13px; font-weight: 600; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
+    select, input[type="number"] { width: 100%; padding: 12px 14px; background: var(--dark-gray); border: 1px solid var(--border); color: var(--text); border-radius: 6px; }
+    select:focus, input[type="number"]:focus { border-color: var(--btc-gold); outline: none; }
+    .actions { display: flex; gap: 10px; flex-wrap: wrap; }
+    button { padding: 12px 16px; background: var(--btc-gold); border: none; color: var(--black); font-weight: 700; cursor: pointer; border-radius: 6px; letter-spacing: 0.05em; transition: transform 0.1s; }
+    button:hover { background: var(--gold-dark); transform: translateY(-1px); }
+    button.ghost { background: transparent; border: 2px solid var(--btc-gold); color: var(--btc-gold); }
+    button.ghost:hover { background: var(--btc-gold); color: var(--black); }
+    button.small { padding: 8px 12px; font-size: 12px; }
+    .badge { padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; border: 1px solid var(--border); }
+    .badge-high { background: rgba(16,185,129,0.15); color: var(--success); border-color: rgba(16,185,129,0.3); }
+    .badge-medium { background: rgba(247,147,26,0.15); color: var(--btc-gold); border-color: rgba(247,147,26,0.3); }
+    .badge-low { background: rgba(239,68,68,0.15); color: var(--error); border-color: rgba(239,68,68,0.3); }
+    .badge-cache { background: rgba(59,130,246,0.15); color: #3b82f6; border-color: rgba(59,130,246,0.3); }
+    .badge-risk-low { background: rgba(16,185,129,0.1); color: var(--success); }
+    .badge-risk-medium { background: rgba(247,147,26,0.1); color: var(--btc-gold); }
+    .badge-risk-high { background: rgba(239,68,68,0.1); color: var(--error); }
+    .network-line { margin-top: 12px; display: flex; gap: 8px; align-items: center; }
+    .network-line .muted { margin: 0; }
+    .status { margin-top: 12px; padding: 10px 12px; border-radius: 6px; background: var(--dark-gray); border-left: 3px solid var(--btc-gold); color: var(--muted); }
+    .status.error { background: rgba(239,68,68,0.1); border-left-color: var(--error); color: var(--error); }
+    .compare-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px,1fr)); gap: 14px; }
+    .compare-card { background: var(--dark-gray); border: 1px solid var(--border); padding: 18px; border-radius: 6px; border-top: 3px solid var(--btc-gold); }
+    .compare-summary { padding: 14px 16px; background: var(--dark-gray); border: 1px dashed var(--border); border-radius: 6px; margin-bottom: 12px; font-weight: 600; }
+    .history-list { display: grid; gap: 10px; }
+    .history-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px,1fr)); gap: 10px; padding: 12px 14px; background: var(--dark-gray); border: 1px solid var(--border); border-radius: 6px; border-left: 3px solid var(--btc-gold); }
+    .history-row span { display: block; color: var(--muted); font-size: 12px; }
+    .details { margin-top: 14px; }
+    .muted { color: var(--muted); }
+    .explanation, .rules { margin: 10px 0; padding-left: 18px; }
+    .explanation li, .rules li { margin-bottom: 6px; }
+
+    /* --- NEW FOOTER STYLES --- */
+    .main-footer {
+        background: var(--dark-gray);
+        border-top: 4px solid var(--btc-gold);
+        margin-top: 60px;
+        padding: 40px 0 0;
+    }
+    .footer-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 40px;
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 0 24px 40px;
+    }
+    .footer-col h3 {
+        color: var(--btc-gold);
+        font-size: 16px;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        margin-bottom: 20px;
+    }
+    .footer-col p {
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.6;
+        margin-bottom: 16px;
+    }
+    .footer-links {
+        list-style: none;
+    }
+    .footer-links li {
+        margin-bottom: 12px;
+    }
+    .footer-links a {
+        color: var(--muted);
+        text-decoration: none;
+        font-size: 14px;
+        transition: color 0.2s;
+    }
+    .footer-links a:hover {
+        color: var(--btc-gold);
+        text-decoration: underline;
+    }
+    .footer-bottom {
+        background: var(--near-black);
+        padding: 20px 24px;
+        text-align: center;
+        border-top: 1px solid var(--border);
+    }
+    .footer-bottom p {
+        color: #555;
+        font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <div class="title-row">
+        <div>
+          <p class="eyebrow">Bitcoin · Mempool</p>
+          <h1>Fee Advisor</h1>
+          <p class="lede">Real-time suggestions, comparisons, and custom fee estimates using live mempool data.</p>
+        </div>
+        <nav class="tabs">
+          <button class="tab active" data-tab="live">Live</button>
+          <button class="tab" data-tab="recommend">Recommend</button>
+          <button class="tab" data-tab="estimate">Custom Fee</button>
+          <button class="tab" data-tab="compare">Compare</button>
+          <button class="tab" data-tab="miner-targets">Miner Targets</button>
+          <button class="tab" data-tab="history">History</button>
+        </nav>
+      </div>
+    </header>
+
+    <section id="tab-live" class="tab-panel active">
+      <div id="liveStatus" class="card">
+        <div class="result-header">
+          <h2>Live Status</h2>
+          <span id="liveCache" class="badge badge-cache hidden">cache</span>
+        </div>
+        <div class="stats" id="liveStats">
+          <div><span>Last Updated</span><b id="liveUpdated">-</b></div>
+          <div><span>Mempool Tx</span><b id="liveMempool">-</b></div>
+          <div><span>Fastest Fee</span><b id="liveFast">-</b></div>
+          <div><span>Hour Fee</span><b id="liveNormal">-</b></div>
+        </div>
+        <div class="network-line">
+          <span id="liveState" class="badge badge-medium">-</span>
+          <p id="liveNote" class="muted"></p>
+        </div>
+        <p id="liveError" class="status error hidden"></p>
+      </div>
+    </section>
+
+    <section id="tab-recommend" class="tab-panel hidden">
+      <div class="card">
+        <div class="row two-col">
+          <div>
+            <label for="priority">Priority</label>
+            <select id="priority" aria-label="priority">
+              <option value="fast">Fast (1-2 blocks)</option>
+              <option value="medium" selected>Medium (3-6 blocks)</option>
+              <option value="slow">Slow (6-12 blocks)</option>
+            </select>
+          </div>
+          <div>
+            <label for="explainMode">Explanation</label>
+            <select id="explainMode">
+              <option value="none" selected>None</option>
+              <option value="llm">LLM (Gemini)</option>
+            </select>
+          </div>
+        </div>
+        <div class="actions">
+          <button id="btnRecommend">Get Recommendation</button>
+        </div>
+        <p id="status" class="status"></p>
+      </div>
+      <section id="singleResult" class="card hidden"></section>
+    </section>
+
+    <section id="tab-estimate" class="tab-panel hidden">
+      <div class="card">
+        <div class="row two-col">
+          <div>
+             <label for="customFee">Custom Fee (sat/vB)</label>
+            <input id="customFee" type="number" min="0.0001" step="0.0001" placeholder="e.g. 0.5 or 25" />
+          </div>
+          <div>
+             <label for="explainModeEst">Explanation</label>
+            <select id="explainModeEst">
+              <option value="none" selected>None</option>
+              <option value="llm">LLM (Gemini)</option>
+            </select>
+          </div>
+        </div>
+        <div class="actions">
+          <button id="btnEstimate">Estimate</button>
+        </div>
+        <p id="estimateStatus" class="status"></p>
+      </div>
+      <section id="estimateResult" class="card hidden"></section>
+    </section>
+
+    <section id="tab-compare" class="tab-panel hidden">
+      <div class="card" id="compareResult">
+        <div class="row">
+           <label for="explainModeCompare">Explanation</label>
+          <select id="explainModeCompare">
+            <option value="none" selected>None</option>
+            <option value="llm">LLM (Gemini)</option>
+          </select>
+        </div>
+        <div class="actions">
+          <button id="btnCompare" class="ghost">Compare</button>
+        </div>
+        <p id="compareStatus" class="status hidden"></p>
+        <div id="compareVerdict" class="compare-summary hidden"></div>
+        <div id="compareSummary" class="compare-summary hidden"></div>
+        <div class="compare-grid" id="compareGrid"></div>
+      </div>
+    </section>
+
+    <section id="tab-miner-targets" class="tab-panel hidden">
+      <div class="card">
+        <div class="result-header">
+          <h2>Miner Targets</h2>
+          <div class="actions">
+            <label for="minerCount" style="color: var(--muted); font-size: 12px; margin-right:8px;">Show top</label>
+            <input id="minerCount" type="number" min="1" max="6" value="3" style="width:70px; background: var(--dark-gray); color: var(--text); border:1px solid var(--border); border-radius:6px; padding:6px 8px;">
+            <label for="minerFee" style="color: var(--muted); font-size: 12px; margin-left:12px; margin-right:6px;">Your fee (sat/vB)</label>
+            <input id="minerFee" type="number" min="0" step="0.1" placeholder="e.g. 25" style="width:90px; background: var(--dark-gray); color: var(--text); border:1px solid var(--border); border-radius:6px; padding:6px 8px;">
+            <label for="targetBlocks" style="color: var(--muted); font-size: 12px; margin-left:12px; margin-right:6px;">Target blocks</label>
+            <select id="targetBlocks" style="width:90px; background: var(--dark-gray); color: var(--text); border:1px solid var(--border); border-radius:6px; padding:6px 8px;">
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3" selected>3</option>
+              <option value="4">4</option>
+              <option value="5">5</option>
+              <option value="6">6</option>
+            </select>
+            <button id="btnMinerRefresh" class="ghost small">Refresh</button>
+          </div>
+        </div>
+        <p id="minerStatus" class="status"></p>
+        <p id="minerEval" class="status hidden"></p>
+        <p id="minerTargetSummary" class="status hidden"></p>
+        <div id="minerTargetsGrid" class="miner-grid"></div>
+      </div>
+    </section>
+
+    <section id="tab-history" class="tab-panel hidden">
+      <div class="card">
+        <div class="result-header">
+           <h2>Last 10 Records</h2>
+          <button id="btnHistory" class="ghost small">Refresh</button>
+        </div>
+        <div id="historyInsight" class="compare-summary hidden"></div>
+        <div id="historyList" class="history-list"></div>
+      </div>
+    </section>
+  </div>
+
+  <footer class="main-footer">
+    <div class="footer-grid">
+        <div class="footer-col">
+            <h3>Bitcoin Fee Advisor</h3>
+            <p>
+                An intelligent assistant powered by real-time mempool data and Gemini AI. 
+                We help you save on transaction fees by analyzing network congestion and 
+                providing smart recommendations.
+            </p>
+        </div>
+        <div class="footer-col">
+            <h3>Quick Links</h3>
+            <ul class="footer-links">
+                <li><a href="#">Documentation</a></li>
+                <li><a href="#">API Reference</a></li>
+                <li><a href="#">GitHub Repository</a></li>
+                <li><a href="#">Report an Issue</a></li>
+            </ul>
+        </div>
+        <div class="footer-col">
+            <h3>Resources</h3>
+            <ul class="footer-links">
+                <li><a href="https://mempool.space" target="_blank">Mempool.space</a></li>
+                <li><a href="https://bitcoin.org" target="_blank">Bitcoin.org</a></li>
+                <li><a href="https://developer.bitcoin.org" target="_blank">Developer Guide</a></li>
+            </ul>
+        </div>
+        <div class="footer-col">
+            <h3>Disclaimer</h3>
+            <p style="font-size: 12px; opacity: 0.7;">
+                This tool provides estimates based on current network conditions. 
+                Bitcoin fees are volatile. Always double-check before broadcasting 
+                high-value transactions. Not financial advice.
+            </p>
+        </div>
+    </div>
+    <div class="footer-bottom">
+        <p>&copy; 2025 Bitcoin Fee Advisor. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script src="app.js" defer></script>
+</body>
+</html>
